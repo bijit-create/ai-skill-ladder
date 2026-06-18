@@ -1,0 +1,10 @@
+{
+  "name": "ai-skill-ladder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Live, adaptive AI-usage skill-ladder agent (Claude API) for ConveGenius.",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.69.0"
+  }
+}

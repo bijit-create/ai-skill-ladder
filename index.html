@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Skill Ladder — a 2-minute check</title>
+<style>
+  :root {
+    --ink: #1a2238; --muted: #5b6577; --line: #e4e8f0; --card: #fff;
+    --bg: #f4f6fb; --accent: #4f46e5; --accent-soft: #eef0fe;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.5;
+    -webkit-font-smoothing: antialiased; min-height: 100vh;
+  }
+  .wrap { max-width: 620px; margin: 0 auto; padding: clamp(16px,4vw,28px) clamp(14px,4vw,20px) 56px; }
+  header.hero {
+    background: linear-gradient(135deg,#4f46e5 0%,#7c3aed 55%,#db2777 100%);
+    color: #fff; border-radius: 18px; padding: clamp(22px,5vw,30px) clamp(20px,5vw,26px); margin-bottom: 18px;
+  }
+  header.hero h1 { margin: 0 0 6px; font-size: clamp(1.3rem,5vw,1.55rem); letter-spacing: -0.01em; }
+  header.hero p { margin: 0; opacity: .92; font-size: .95rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: clamp(18px,4.5vw,24px); }
+
+  label.field { display: block; font-weight: 600; font-size: .92rem; margin: 0 0 6px; }
+  .hint { color: var(--muted); font-size: .85rem; margin: 0 0 16px; }
+  input[type=text], select {
+    width: 100%; padding: 12px 13px; font-size: 1rem; color: var(--ink);
+    border: 1.5px solid var(--line); border-radius: 11px; background: #fff; margin-bottom: 16px;
+  }
+  input[type=text]:focus, select:focus { outline: none; border-color: var(--accent); }
+  .toggle { display: flex; gap: 10px; margin-bottom: 16px; }
+  .toggle button { flex: 1; padding: 12px; font-size: 1rem; font-weight: 600; color: var(--ink);
+    background: #fff; border: 1.5px solid var(--line); border-radius: 11px; cursor: pointer;
+    transition: border-color .15s, background .15s, color .15s; }
+  .toggle button:hover { border-color: #c3c9f7; }
+  .toggle button.sel { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+  .progress-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .progress-label { font-size: .82rem; font-weight: 600; color: var(--muted); }
+  .progress-track { height: 7px; border-radius: 999px; background: #edf0f6; overflow: hidden; margin-bottom: 20px; }
+  .progress-fill { height: 100%; width: 10%; border-radius: 999px; background: var(--accent); transition: width .35s ease; }
+
+  .question { font-weight: 600; font-size: clamp(1.05rem,4.2vw,1.18rem); margin: 0 0 16px; }
+  #qArea { transition: opacity .2s ease; min-height: 120px; }
+  label.opt {
+    display: flex; gap: 11px; align-items: flex-start; padding: 13px 14px; margin-bottom: 9px;
+    border: 1.5px solid var(--line); border-radius: 11px; cursor: pointer; font-size: .96rem; color: #2a3346;
+    transition: border-color .15s, background .15s;
+  }
+  label.opt:hover { border-color: #c3c9f7; background: #fafbff; }
+  label.opt input { margin: 2px 0 0; accent-color: var(--accent); flex: 0 0 auto; width: 18px; height: 18px; }
+  label.opt.sel { border-color: var(--accent); background: var(--accent-soft); }
+
+  .nav { display: flex; gap: 12px; margin-top: 18px; }
+  .btn { flex: 1 1 auto; border: 0; border-radius: 12px; padding: 14px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background .15s, opacity .15s; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #4338ca; }
+  .btn.primary:disabled { opacity: .45; cursor: not-allowed; }
+
+  .thinking { text-align: center; color: var(--muted); font-size: .9rem; padding: 28px 0; }
+  .dots::after { content: "…"; animation: dots 1.2s steps(4,end) infinite; }
+  @keyframes dots { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} }
+
+  /* result */
+  #result { display: none; text-align: center; }
+  .greeting { font-size: 1.15rem; font-weight: 700; margin-bottom: 8px; }
+  .score-big { font-size: clamp(3rem,14vw,4rem); font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--accent); }
+  .score-big .den { font-size: 1.4rem; color: var(--muted); font-weight: 600; }
+  .scale { height: 12px; border-radius: 999px; background: #edf0f6; overflow: hidden; margin: 22px 0 6px; }
+  .scale-fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg,#3b82f6,#7c3aed,#db2777); transition: width .9s cubic-bezier(.2,.8,.2,1); }
+  .scale-ends { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); }
+  .level { font-size: 1.35rem; font-weight: 700; margin: 18px 0 4px; }
+  .level-note { color: var(--muted); font-size: .95rem; margin: 0; }
+  .saved-note { color: var(--muted); font-size: .8rem; margin-top: 18px; }
+
+  .err { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 11px; padding: 12px 14px; font-size: .9rem; color: #92400e; margin-top: 12px; display: none; }
+  .note { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <h1>AI Skill Ladder</h1>
+    <p>A short, adaptive check of how much of your real work is AI-powered. About two minutes. Answer for what you actually do.</p>
+  </header>
+
+  <!-- STEP 1: who -->
+  <div class="card" id="startCard">
+    <label class="field" for="nameInput">Your name</label>
+    <p class="hint">So we can greet you with your result and your team lead knows whose it is. No email needed.</p>
+    <input type="text" id="nameInput" maxlength="40" placeholder="e.g. Ayushi" autocomplete="off" />
+
+    <label class="field" for="deptSelect">Your team</label>
+    <p class="hint">You'll get questions about the work this team really does.</p>
+    <select id="deptSelect"></select>
+
+    <label class="field">Do you work out of the Delhi NCR office?</label>
+    <div class="toggle" id="officeToggle">
+      <button type="button" data-v="Yes">Yes</button>
+      <button type="button" data-v="No">No</button>
+    </div>
+
+    <div class="nav"><button class="btn primary" id="startBtn" type="button" disabled>Start</button></div>
+    <div class="err" id="startErr"></div>
+  </div>
+
+  <!-- STEP 2: quiz -->
+  <div class="card" id="quizCard" style="display:none;">
+    <div class="progress-row">
+      <span class="progress-label" id="progressLabel">Question 1 of 10</span>
+      <span class="progress-label" id="deptLabel"></span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div id="qArea"></div>
+    <div class="nav"><button class="btn primary" id="nextBtn" type="button" disabled>Next</button></div>
+    <div class="err" id="quizErr"></div>
+  </div>
+
+  <!-- STEP 3: result (score only) -->
+  <div class="card" id="result">
+    <div class="greeting" id="greeting"></div>
+    <div class="score-big"><span id="scoreNum">0</span><span class="den"> / 10</span></div>
+    <div class="scale"><div class="scale-fill" id="scaleFill"></div></div>
+    <div class="scale-ends"><span>1 · just starting</span><span>10 · builds &amp; ships</span></div>
+    <div class="level" id="levelLabel"></div>
+    <p class="level-note" id="levelNote">There is no pass or fail — this is where your work sits today.</p>
+    <p class="saved-note" id="savedNote"></p>
+  </div>
+
+  <p class="note">Pick what is true, not what sounds best. We keep your name and team — never your email.</p>
+</div>
+
+<script>
+  /* ===========================================================================
+     CONFIG
+     - API_BASE: where the live agent function lives. "" = same origin (Vercel
+       serves /api/agent next to this page). Set to a full URL if hosted apart.
+     - RECORDER_URL: the Apps Script web-app URL that writes results to the Sheet
+       (see AI-Skill-Ladder-Apps-Script.gs). Leave "" to not record.
+     - Add ?mock=1 to the page URL to force the offline mock (no backend needed).
+     =========================================================================== */
+  var API_BASE = "";
+  var RECORDER_URL = "https://script.google.com/macros/s/AKfycby5vQQqYMUAD9RxbHCy8XV0-jrNZrmtzB3c6jcv0KXyelYGCqrs2xHZDyEBN4qO93Wt2w/exec";
+  var TOTAL = 10;
+  var DIMS = ["Adoption", "Prompting", "Reusable skills", "Verification", "Automation", "Building"];
+
+  var DEPARTMENTS = [
+    "Product", "Engineering", "Content / Curriculum", "Academic / Pedagogy",
+    "Sales / Partnerships", "Customer Success", "Operations", "Program / Implementation",
+    "Data / Analytics", "HR / People", "Finance", "Design", "Marketing",
+    "Leadership / Management", "Other"
+  ];
+
+  var forceMock = /[?&]mock=1/.test(location.search);
+  var useMock = forceMock;
+
+  /* ---- state ---- */
+  var personName = "", department = "", office = "", current = 0, chosen = null; // NOT named `name` (that shadows window.name)
+  var responses = [];         // [{area, question, options:[...], chosen:idx, chosenText}] — NOT named `history` (that shadows window.history)
+  var currentQuestion = null; // {area, question, options:[...]}
+
+  /* ---- elements ---- */
+  var nameInput = document.getElementById("nameInput");
+  var deptSelect = document.getElementById("deptSelect");
+  var startBtn = document.getElementById("startBtn");
+  var startCard = document.getElementById("startCard");
+  var startErr = document.getElementById("startErr");
+  var quizCard = document.getElementById("quizCard");
+  var qArea = document.getElementById("qArea");
+  var nextBtn = document.getElementById("nextBtn");
+  var quizErr = document.getElementById("quizErr");
+  var progressLabel = document.getElementById("progressLabel");
+  var progressFill = document.getElementById("progressFill");
+  var deptLabel = document.getElementById("deptLabel");
+
+  /* ---- setup ---- */
+  DEPARTMENTS.forEach(function (d) {
+    var o = document.createElement("option");
+    o.value = d; o.textContent = d; deptSelect.appendChild(o);
+  });
+  deptSelect.value = "";
+  var ph = document.createElement("option");
+  ph.value = ""; ph.textContent = "Choose your team…"; ph.disabled = true; ph.selected = true;
+  deptSelect.insertBefore(ph, deptSelect.firstChild);
+
+  try { var saved = localStorage.getItem("skillLadderName"); if (saved) nameInput.value = saved; } catch (e) {}
+
+  var officeToggle = document.getElementById("officeToggle");
+  Array.prototype.forEach.call(officeToggle.querySelectorAll("button"), function (b) {
+    b.addEventListener("click", function () {
+      office = b.getAttribute("data-v");
+      Array.prototype.forEach.call(officeToggle.querySelectorAll("button"), function (x) { x.classList.remove("sel"); });
+      b.classList.add("sel");
+      checkStart();
+    });
+  });
+  function checkStart() { startBtn.disabled = !(nameInput.value.trim() && deptSelect.value && office); }
+  nameInput.addEventListener("input", checkStart);
+  deptSelect.addEventListener("change", checkStart);
+  checkStart();
+
+  /* ---- talk to the agent (or mock) ---- */
+  function callAgent(action, payload) {
+    if (useMock) return Promise.resolve(mockAgent(action, payload));
+    return fetch(API_BASE + "/api/agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ action: action }, payload))
+    }).then(function (res) {
+      if (!res.ok) throw new Error("Agent unavailable (" + res.status + ")");
+      return res.json();
+    });
+  }
+
+  /* ---- start ---- */
+  startBtn.addEventListener("click", function () {
+    personName = nameInput.value.trim();
+    department = deptSelect.value;
+    try { localStorage.setItem("skillLadderName", personName); } catch (e) {}
+    responses = []; current = 0;
+    deptLabel.textContent = department;
+    startErr.style.display = "none";
+    startBtn.disabled = true; startBtn.textContent = "Starting…";
+
+    askNext().then(function () {
+      startCard.style.display = "none";
+      quizCard.style.display = "block";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }).catch(function (err) {
+      // backend not reachable → fall back to the offline mock and retry once
+      if (!useMock) {
+        useMock = true;
+        return askNext().then(function () {
+          startCard.style.display = "none";
+          quizCard.style.display = "block";
+        });
+      }
+      startErr.textContent = "Could not start: " + err.message;
+      startErr.style.display = "block";
+    }).then(function () {
+      startBtn.disabled = false; startBtn.textContent = "Start";
+    });
+  });
+
+  /* ---- ask the next adaptive question ---- */
+  function askNext() {
+    chosen = null;
+    nextBtn.disabled = true;
+    progressLabel.textContent = "Question " + (current + 1) + " of " + TOTAL;
+    progressFill.style.width = (current / TOTAL * 100) + "%";
+    qArea.innerHTML = '<div class="thinking"><span class="dots">Choosing your next question</span></div>';
+    quizErr.style.display = "none";
+
+    return callAgent("next", { department: department, history: responses }).then(function (q) {
+      currentQuestion = q;
+      renderQuestion(q);
+    }).catch(function (err) {
+      quizErr.textContent = "Hiccup talking to the agent: " + err.message + ". Tap Next to retry.";
+      quizErr.style.display = "block";
+      nextBtn.disabled = false;
+      nextBtn.textContent = "Retry";
+    });
+  }
+
+  function renderQuestion(q) {
+    qArea.style.opacity = 0;
+    var html = '<p class="question">' + (current + 1) + ". " + escapeHtml(q.question) + "</p>";
+    q.options.forEach(function (text, i) {
+      html += '<label class="opt" data-i="' + i + '"><input type="radio" name="opt" value="' + i + '">' +
+              '<span>' + escapeHtml(text) + "</span></label>";
+    });
+    qArea.innerHTML = html;
+    Array.prototype.forEach.call(qArea.querySelectorAll("input[name=opt]"), function (inp) {
+      inp.addEventListener("change", function () {
+        chosen = parseInt(inp.value, 10);
+        Array.prototype.forEach.call(qArea.querySelectorAll("label.opt"), function (l) { l.classList.remove("sel"); });
+        inp.closest("label.opt").classList.add("sel");
+        nextBtn.disabled = false;
+      });
+    });
+    nextBtn.textContent = (current === TOTAL - 1) ? "See my score" : "Next";
+    setTimeout(function () { qArea.style.opacity = 1; }, 30);
+  }
+
+  /* ---- next / finish ---- */
+  nextBtn.addEventListener("click", function () {
+    if (nextBtn.textContent === "Retry") { askNext(); return; }
+    if (chosen === null) return;
+    responses.push({
+      area: currentQuestion.area || "",
+      question: currentQuestion.question,
+      options: currentQuestion.options,
+      chosen: chosen,
+      chosenText: currentQuestion.options[chosen]
+    });
+    current++;
+    if (current >= TOTAL) { finish(); }
+    else { askNext(); }
+  });
+
+  /* ---- score + record ---- */
+  function finish() {
+    progressFill.style.width = "100%";
+    qArea.innerHTML = '<div class="thinking"><span class="dots">Working out your score</span></div>';
+    nextBtn.disabled = true; nextBtn.style.display = "none";
+
+    callAgent("score", { department: department, history: responses }).then(function (r) {
+      showResult(r);
+      record(r);
+    }).catch(function (err) {
+      quizErr.textContent = "Could not score: " + err.message;
+      quizErr.style.display = "block";
+      nextBtn.style.display = "block"; nextBtn.disabled = false; nextBtn.textContent = "Retry score";
+      nextBtn.onclick = finish;
+    });
+  }
+
+  function showResult(r) {
+    var score = Math.max(1, Math.min(10, Math.round(r.score)));
+    var first = (personName.split(/\s+/)[0] || personName);
+    document.getElementById("greeting").textContent = "Okay, " + first + " 👋";
+    document.getElementById("scoreNum").textContent = score;
+    document.getElementById("levelLabel").textContent = r.level || "";
+    document.getElementById("levelNote").textContent =
+      "That's where your work sits today, " + first + " — no pass or fail, just a snapshot of right now.";
+    quizCard.style.display = "none";
+    document.getElementById("result").style.display = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(function () { document.getElementById("scaleFill").style.width = (score * 10) + "%"; }, 120);
+  }
+
+  function record(r) {
+    var note = document.getElementById("savedNote");
+    if (!RECORDER_URL) { note.textContent = useMock ? "Demo mode — nothing was saved." : "Your result is shown above (recording not set up)."; return; }
+    var payload = {
+      name: personName, department: department, office: office,
+      score: Math.max(1, Math.min(10, Math.round(r.score))),
+      level: r.level || "",
+      dimensions: r.dimensions || [],
+      insight: r.insight || "",
+      answers: responses.map(function (h) { return { area: h.area, choice: h.chosenText }; })
+    };
+    try {
+      fetch(RECORDER_URL, {
+        method: "POST", mode: "no-cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
+      note.textContent = "Recorded for your team (no name, no email).";
+    } catch (e) { note.textContent = "Your score is shown above."; }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  /* ===========================================================================
+     OFFLINE MOCK — used when the live agent isn't reachable (or ?mock=1).
+     The real depth comes from the Claude agent; this just keeps the page usable
+     and lets the dashboard be populated for testing. Options carry a hidden
+     weight (0-3) and a dimension tag; order is shuffled so it isn't an obvious
+     1-2-3-4 ladder.
+     =========================================================================== */
+  var MOCK_BANK = [
+    { dim: "Adoption", q: "Think about yesterday — how did AI show up in your work?", o: [
+      ["I didn't open an AI tool", 0], ["I asked it one or two quick things", 1],
+      ["I leaned on it across several different tasks", 2], ["Most of what I shipped passed through something I'd set up", 3] ] },
+    { dim: "Prompting", q: "When you needed something specific from AI recently, what did the ask look like?", o: [
+      ["A one-liner, then I took what came back", 0], ["I kept nudging it until it landed", 1],
+      ["One brief with the context and the shape I wanted", 2], ["I didn't write it — a saved setup already carries the brief", 3] ] },
+    { dim: "Reusable skills", q: "Your standards for this work mostly live…", o: [
+      ["in my head; I redo them each time", 0], ["pasted from older chats when I remember", 1],
+      ["in a few prompts or templates I keep handy", 2], ["in a reusable setup the team runs the same way", 3] ] },
+    { dim: "Verification", q: "Last time an AI output actually mattered, how did you decide to trust it?", o: [
+      ["it read fine, so I used it", 0], ["I fixed the parts that looked off", 1],
+      ["I checked it against a couple of things I'd decided up front", 2], ["a written check runs on it before it goes out", 3] ] },
+    { dim: "Automation", q: "A batch of similar items lands on you. What usually happens?", o: [
+      ["I work through them myself", 0], ["I reuse an AI draft for each one", 1],
+      ["I push them through in one go with a fixed shape", 2], ["something I built handles the run; I spot-check", 3] ] },
+    { dim: "Building", q: "Has anything you set up with AI ended up in someone else's hands?", o: [
+      ["no", 0], ["I shared a prompt that worked for me", 1],
+      ["a small tool I made, used by a teammate or two", 2], ["something I ship and keep improving that others depend on", 3] ] },
+    { dim: "Adoption", q: "If AI tools vanished for a day, your week would…", o: [
+      ["barely change", 0], ["be a few tasks slower", 1],
+      ["be noticeably slower across the day", 2], ["have several things that just wouldn't run", 3] ] },
+    { dim: "Automation", q: "Do any of your tasks run without you kicking them off?", o: [
+      ["no", 0], ["I trigger them and AI helps", 1],
+      ["one runs on a schedule and waits for my review", 2], ["a few run and route themselves; I'm the exception-handler", 3] ] },
+    { dim: "Building", q: "Closest to your experience with AI tools or agents that act on their own?", o: [
+      ["haven't tried one", 0], ["played with one", 1],
+      ["built one that works for me", 2], ["built ones others use, with guardrails", 3] ] },
+    { dim: "Prompting", q: "New AI ways of doing your work — where are you?", o: [
+      ["haven't really looked", 0], ["I try things for myself now and then", 1],
+      ["I've a new way I use regularly", 2], ["I've rolled new ways out to other people", 3] ] }
+  ];
+
+  function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+  function mockAgent(action, payload) {
+    if (action === "next") {
+      var n = payload.history.length;
+      var item = MOCK_BANK[n % MOCK_BANK.length];
+      var opts = shuffle(item.o.map(function (x) { return { t: x[0], w: x[1] }; }));
+      // stash weights on the question so mock scoring can read the chosen weight back
+      mockAgent._w = mockAgent._w || {};
+      mockAgent._w[item.q] = {};
+      opts.forEach(function (op, i) { mockAgent._w[item.q][op.t] = op.w; });
+      return { area: item.dim, question: item.q, options: opts.map(function (op) { return op.t; }) };
+    }
+    if (action === "score") {
+      var byDim = {}; DIMS.forEach(function (d) { byDim[d] = []; });
+      var total = 0, max = 0;
+      payload.history.forEach(function (h) {
+        var w = (mockAgent._w[h.question] || {})[h.chosenText]; if (w == null) w = 1;
+        total += w; max += 3;
+        if (byDim[h.area]) byDim[h.area].push(w);
+      });
+      var score = Math.max(1, Math.min(10, Math.round((total / (max || 1)) * 9 + 1)));
+      var dimensions = DIMS.map(function (d) {
+        var arr = byDim[d]; var avg = arr && arr.length ? arr.reduce(function (a, b) { return a + b; }, 0) / arr.length : (total / (payload.history.length || 1));
+        return { name: d, value: Math.max(1, Math.min(10, Math.round(avg / 3 * 9 + 1))) };
+      });
+      var levels = ["Just starting", "Just starting", "Hands-on user", "Hands-on user", "Hands-on user",
+                    "Delegator", "Delegator", "Builder", "Builder", "Ships for others", "Ships for others"];
+      return { score: score, level: levels[score], dimensions: dimensions,
+               insight: "(demo) Strongest on " + topDim(dimensions) + "; biggest opportunity is moving routine work toward automation and reusable tools." };
+    }
+    return {};
+  }
+  function topDim(dims) { var best = dims[0]; dims.forEach(function (d) { if (d.value > best.value) best = d; }); return best.name; }
+</script>
+</body>
+</html>

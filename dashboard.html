@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Skill Ladder — backend dashboard</title>
+<style>
+  :root {
+    --ink: #1a2238; --muted: #5b6577; --line: #e4e8f0; --card: #fff;
+    --bg: #f4f6fb; --accent: #4f46e5; --soft: #eef0fe;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.5; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 18px 64px; }
+  header.hero { background: linear-gradient(135deg,#4f46e5 0%,#7c3aed 55%,#db2777 100%); color: #fff;
+    border-radius: 18px; padding: 24px 26px; margin-bottom: 20px; }
+  header.hero h1 { margin: 0 0 4px; font-size: 1.5rem; }
+  header.hero p { margin: 0; opacity: .92; font-size: .95rem; }
+
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+  .controls input { flex: 1 1 320px; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; font-size: .92rem; }
+  .controls button { padding: 10px 16px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+  .muted { color: var(--muted); font-size: .85rem; }
+
+  h2 { font-size: 1.05rem; margin: 26px 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+  .card.dept h3 { margin: 0; font-size: 1rem; }
+  .depthead { display: flex; justify-content: space-between; align-items: baseline; }
+  .bigscore { font-size: 1.7rem; font-weight: 800; color: var(--accent); line-height: 1; }
+  .bigscore small { font-size: .8rem; color: var(--muted); font-weight: 600; }
+  .count { font-size: .8rem; color: var(--muted); }
+  svg.radar { display: block; width: 100%; height: auto; margin: 6px 0 2px; }
+
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; font-size: .9rem; border-bottom: 1px solid var(--line); }
+  th { background: #fafbff; color: var(--muted); font-weight: 600; }
+  tr.person { cursor: pointer; }
+  tr.person:hover { background: #fafbff; }
+  .pill { display: inline-block; min-width: 26px; text-align: center; padding: 2px 8px; border-radius: 999px; color: #fff; font-weight: 700; font-size: .82rem; }
+
+  .panel { display: none; }
+  .person-detail { display: grid; grid-template-columns: 280px 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 640px) { .person-detail { grid-template-columns: 1fr; } }
+  .insight { background: var(--soft); border: 1px solid #d9def8; border-radius: 12px; padding: 12px 14px; font-size: .9rem; }
+  .answers { margin: 10px 0 0; padding-left: 18px; font-size: .85rem; color: #2a3346; }
+  .answers li { margin-bottom: 3px; }
+  .empty { background: var(--card); border: 1px dashed var(--line); border-radius: 14px; padding: 28px; text-align: center; color: var(--muted); }
+  .err { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 12px; padding: 12px 14px; font-size: .9rem; color: #92400e; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <h1>AI Skill Ladder — team view</h1>
+    <p>How AI usage sits across departments and people. Six dimensions, scored 1–10. Backend only — not shown to respondents.</p>
+  </header>
+
+  <div class="controls">
+    <input type="text" id="dataUrl" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+           placeholder="https://script.google.com/macros/s/…/exec?key=YOURKEY" />
+    <button id="loadBtn" type="button">Load</button>
+    <span class="muted" id="status"></span>
+  </div>
+  <p class="muted" style="margin:-8px 0 18px">Paste the Apps Script <b>web-app URL</b> (ends in <code>/exec</code>) — not the Sheet ID. No data yet? Open this page with <code>?demo=1</code> to preview.</p>
+
+  <div id="content"></div>
+</div>
+
+<script>
+  // Paste the Apps Script web-app URL here (its doGet, e.g. ".../exec?key=YOURKEY")
+  // or pass ?data=<url> in the page URL. Use ?demo=1 to render with sample data.
+  var DATA_URL = "https://script.google.com/macros/s/AKfycby5vQQqYMUAD9RxbHCy8XV0-jrNZrmtzB3c6jcv0KXyelYGCqrs2xHZDyEBN4qO93Wt2w/exec";
+
+  var DIMS = ["Adoption", "Prompting", "Reusable skills", "Verification", "Automation", "Building"];
+  var COLORS = { low: "#3b82f6", mid: "#14b8a6", high: "#f59e0b", top: "#db2777" };
+  function scoreColor(s) { return s <= 3 ? COLORS.low : s <= 5 ? COLORS.mid : s <= 8 ? COLORS.high : COLORS.top; }
+
+  var qs = new URLSearchParams(location.search);
+  var dataInput = document.getElementById("dataUrl");
+  var statusEl = document.getElementById("status");
+  var content = document.getElementById("content");
+  if (qs.get("data")) dataInput.value = qs.get("data");
+  else if (DATA_URL) dataInput.value = DATA_URL;
+  // a browser may autofill this generic text field with a stray value (e.g. a Sheet ID) — clear anything that isn't a URL
+  if (dataInput.value && !/^https?:\/\//i.test(dataInput.value)) dataInput.value = "";
+
+  document.getElementById("loadBtn").addEventListener("click", function () { load(dataInput.value.trim()); });
+
+  if (qs.get("demo") === "1") { render(DEMO_ROWS()); statusEl.textContent = "showing demo data"; }
+  else if (dataInput.value) { load(dataInput.value); }
+  else { content.innerHTML = '<div class="empty">Paste your Apps Script data URL above and press Load — or open this page with <code>?demo=1</code> to see sample charts.</div>'; }
+
+  function load(url) {
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) {
+      content.innerHTML = '<div class="err">That looks like a <b>Sheet ID</b>, not the dashboard link. Paste the Apps Script <b>web-app URL</b> — it starts with <code>https://script.google.com/…</code> and ends in <code>/exec</code> (add <code>?key=YOURKEY</code> if you set one). The Sheet ID goes inside the Apps Script (<code>SHEET_ID</code>), not here. To preview with sample data, open this page with <code>?demo=1</code>.</div>';
+      statusEl.textContent = "";
+      return;
+    }
+    statusEl.textContent = "loading…";
+    // JSONP — avoids cross-origin (CORS) trouble that plain fetch hits with Apps Script.
+    jsonp(url, function (err, j) {
+      if (err) {
+        content.innerHTML = '<div class="err">Could not load: ' + esc(err) + '<br><br>Most often this means the web app is <b>not shared with “Anyone”</b> — re-deploy it with <b>Who has access: Anyone</b> (open the deployed <code>/exec</code> link in a new tab; if it asks you to sign in, that\'s the problem). It can also mean the URL or key is wrong. To preview meanwhile, open this page with <code>?demo=1</code>.</div>';
+        statusEl.textContent = "";
+        return;
+      }
+      if (j && j.ok === false) {
+        var keyHint = /key/i.test(j.error || "") ? ' Add <code>?key=YOURKEY</code> to the URL (it must match DASHBOARD_KEY in the script).' : '';
+        content.innerHTML = '<div class="err">The web app replied: ' + esc(j.error || "error") + '.' + keyHint + '</div>';
+        statusEl.textContent = "";
+        return;
+      }
+      var rows = (j && j.rows) || j || [];
+      rows = rows.map(normalizeRow);
+      render(rows);
+      statusEl.textContent = rows.length + " " + (rows.length === 1 ? "response" : "responses");
+    });
+  }
+
+  // Load Apps Script data via a <script> tag callback (JSONP) — no CORS needed.
+  function jsonp(url, cb) {
+    var name = "__sklcb_" + Date.now();
+    var sep = url.indexOf("?") >= 0 ? "&" : "?";
+    var script = document.createElement("script");
+    var done = false;
+    function finish(err, data) {
+      if (done) return; done = true;
+      clearTimeout(timer);
+      try { delete window[name]; } catch (e) { window[name] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+      cb(err || null, data);
+    }
+    var timer = setTimeout(function () { finish("the request timed out"); }, 15000);
+    window[name] = function (data) { finish(null, data); };
+    script.onerror = function () { finish("the browser could not load the web app"); };
+    script.src = url + sep + "callback=" + name;
+    document.head.appendChild(script);
+  }
+
+  function normalizeRow(r) {
+    var dims = r.dimensions;
+    if (typeof dims === "string") { try { dims = JSON.parse(dims); } catch (e) { dims = []; } }
+    if (!Array.isArray(dims)) dims = [];
+    var answers = r.answers;
+    if (typeof answers === "string") { try { answers = JSON.parse(answers); } catch (e) { answers = []; } }
+    return { timestamp: r.timestamp || r.Timestamp || "", name: r.name || r.code || "", department: r.department || "—",
+             office: r.office || "", score: Number(r.score) || 0, level: r.level || "", dimensions: dims, insight: r.insight || "",
+             answers: Array.isArray(answers) ? answers : [] };
+  }
+
+  function dimValue(dims, name) { var f = dims.find(function (d) { return d.name === name; }); return f ? Number(f.value) || 0 : 0; }
+
+  /* ---- render ---- */
+  function render(rows) {
+    if (!rows.length) { content.innerHTML = '<div class="empty">No responses yet.</div>'; return; }
+
+    // group by department
+    var byDept = {};
+    rows.forEach(function (r) { (byDept[r.department] = byDept[r.department] || []).push(r); });
+
+    var html = "";
+
+    // office split (Delhi NCR vs other)
+    var ncr = rows.filter(function (r) { return /yes/i.test(r.office); });
+    var other = rows.filter(function (r) { return !/yes/i.test(r.office); });
+    html += '<div class="muted" style="margin:0 0 4px">By office — Delhi NCR: <b>' +
+            (ncr.length ? mean(ncr.map(function (r) { return r.score; })).toFixed(1) : "–") + '/10</b> (' + ncr.length + ') · Other: <b>' +
+            (other.length ? mean(other.map(function (r) { return r.score; })).toFixed(1) : "–") + '/10</b> (' + other.length + ')</div>';
+
+    // departments
+    html += '<h2>Departments</h2><div class="grid">';
+    Object.keys(byDept).sort().forEach(function (dept) {
+      var rs = byDept[dept];
+      var avgScore = mean(rs.map(function (r) { return r.score; }));
+      var dimAvgs = DIMS.map(function (d) { return { name: d, value: mean(rs.map(function (r) { return dimValue(r.dimensions, d); })) }; });
+      html += '<div class="card dept"><div class="depthead"><h3>' + esc(dept) + '</h3>' +
+              '<span class="bigscore">' + avgScore.toFixed(1) + '<small>/10</small></span></div>' +
+              '<div class="count">' + rs.length + ' ' + (rs.length === 1 ? "response" : "responses") + '</div>' +
+              radarSVG(dimAvgs, scoreColor(avgScore)) + '</div>';
+    });
+    html += '</div>';
+
+    // people
+    html += '<h2>People</h2><table><thead><tr><th>Name</th><th>Team</th><th>Office</th><th>Level</th><th>Score</th></tr></thead><tbody>';
+    rows.slice().sort(function (a, b) { return b.score - a.score; }).forEach(function (r, i) {
+      var ncrLabel = /yes/i.test(r.office) ? "Delhi NCR" : (r.office ? "Other" : "—");
+      html += '<tr class="person" data-i="' + i + '"><td>' + esc(r.name) + '</td><td>' + esc(r.department) +
+              '</td><td>' + esc(ncrLabel) + '</td><td>' + esc(r.level) + '</td><td><span class="pill" style="background:' + scoreColor(r.score) + '">' + r.score + '</span></td></tr>';
+    });
+    html += '</tbody></table><div id="personPanel" class="panel"></div>';
+
+    content.innerHTML = html;
+
+    var sorted = rows.slice().sort(function (a, b) { return b.score - a.score; });
+    Array.prototype.forEach.call(content.querySelectorAll("tr.person"), function (tr) {
+      tr.addEventListener("click", function () { showPerson(sorted[parseInt(tr.getAttribute("data-i"), 10)]); });
+    });
+  }
+
+  function showPerson(r) {
+    var panel = document.getElementById("personPanel");
+    var dims = DIMS.map(function (d) { return { name: d, value: dimValue(r.dimensions, d) }; });
+    var ans = (r.answers || []).map(function (a) { return '<li><b>' + esc(a.area || "") + ':</b> ' + esc(a.choice || "") + '</li>'; }).join("");
+    panel.style.display = "block";
+    panel.innerHTML = '<div class="card" style="margin-top:16px"><h3 style="margin:0 0 4px">' + esc(r.name) + ' · ' + esc(r.department) +
+      (r.office ? ' · Delhi NCR: ' + esc(r.office) : '') +
+      ' · <span class="pill" style="background:' + scoreColor(r.score) + '">' + r.score + '/10</span> ' + esc(r.level) + '</h3>' +
+      '<div class="person-detail"><div>' + radarSVG(dims, scoreColor(r.score)) + '</div><div>' +
+      (r.insight ? '<div class="insight"><b>Insight:</b> ' + esc(r.insight) + '</div>' : '') +
+      (ans ? '<ul class="answers">' + ans + '</ul>' : '') + '</div></div></div>';
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  /* ---- vanilla SVG radar (6 axes, scored 1-10) ---- */
+  function radarSVG(dims, color) {
+    var cx = 130, cy = 120, R = 88, N = dims.length;
+    function pt(value, i) {
+      var ang = -Math.PI / 2 + i * 2 * Math.PI / N;
+      var r = Math.max(0, Math.min(10, value)) / 10 * R;
+      return [cx + r * Math.cos(ang), cy + r * Math.sin(ang)];
+    }
+    var s = '<svg class="radar" viewBox="0 0 260 240" xmlns="http://www.w3.org/2000/svg">';
+    // grid rings
+    [2, 4, 6, 8, 10].forEach(function (v) {
+      var pts = []; for (var i = 0; i < N; i++) { var p = pt(v, i); pts.push(p[0].toFixed(1) + "," + p[1].toFixed(1)); }
+      s += '<polygon points="' + pts.join(" ") + '" fill="none" stroke="#e4e8f0" stroke-width="1"/>';
+    });
+    // axes + labels
+    for (var i = 0; i < N; i++) {
+      var end = pt(10, i);
+      s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + end[0].toFixed(1) + '" y2="' + end[1].toFixed(1) + '" stroke="#e4e8f0" stroke-width="1"/>';
+      var lp = pt(12.6, i);
+      var anchor = lp[0] < cx - 8 ? "end" : lp[0] > cx + 8 ? "start" : "middle";
+      s += '<text x="' + lp[0].toFixed(1) + '" y="' + (lp[1] + 3).toFixed(1) + '" font-size="9" fill="#5b6577" text-anchor="' + anchor + '">' + esc(dims[i].name) + '</text>';
+    }
+    // data polygon
+    var dp = []; for (var j = 0; j < N; j++) { var q = pt(dims[j].value, j); dp.push(q[0].toFixed(1) + "," + q[1].toFixed(1)); }
+    s += '<polygon points="' + dp.join(" ") + '" fill="' + color + '33" stroke="' + color + '" stroke-width="2"/>';
+    for (var k = 0; k < N; k++) { var c = pt(dims[k].value, k); s += '<circle cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="2.6" fill="' + color + '"/>'; }
+    s += '</svg>';
+    return s;
+  }
+
+  function mean(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : 0; }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+
+  /* ---- demo data (?demo=1) ---- */
+  function DEMO_ROWS() {
+    function dim(a, p, r, v, au, b) { return [{ name: "Adoption", value: a }, { name: "Prompting", value: p }, { name: "Reusable skills", value: r }, { name: "Verification", value: v }, { name: "Automation", value: au }, { name: "Building", value: b }]; }
+    return [
+      { timestamp: "", name: "Aarav K", department: "Engineering", office: "Yes", score: 9, level: "Ships for others", dimensions: dim(10, 9, 8, 8, 9, 10), insight: "Strong builder; could formalise evals on the agents already in production.", answers: [{ area: "Building", choice: "ships ones others use, with guardrails" }] },
+      { timestamp: "", name: "Vivaan D", department: "Engineering", office: "Yes", score: 7, level: "Builder", dimensions: dim(8, 8, 6, 6, 7, 7), insight: "Solid hands-on builder; verification is the gap before scaling.", answers: [] },
+      { timestamp: "", name: "Diya M", department: "Sales / Partnerships", office: "No", score: 4, level: "Hands-on user", dimensions: dim(6, 5, 3, 3, 3, 4), insight: "Uses AI for drafts; biggest lift is a reusable proposal skill that holds product facts.", answers: [] },
+      { timestamp: "", name: "Ananya R", department: "Design", office: "Yes", score: 5, level: "Delegator", dimensions: dim(7, 6, 5, 4, 4, 4), insight: "Delegates drafts well; templatising recurring designs would push automation up.", answers: [] },
+      { timestamp: "", name: "Kabir S", department: "Data / Analytics", office: "No", score: 6, level: "Delegator", dimensions: dim(7, 7, 6, 6, 6, 4), insight: "Good analyst; the win is a scheduled report that runs and waits for review.", answers: [] },
+      { timestamp: "", name: "Meera P", department: "Content / Curriculum", office: "Yes", score: 3, level: "Just starting", dimensions: dim(4, 4, 2, 2, 2, 2), insight: "Early; start with one saved skill for question creation to standardise output.", answers: [] }
+    ];
+  }
+</script>
+</body>
+</html>
