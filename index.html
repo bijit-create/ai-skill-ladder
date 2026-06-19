@@ -103,6 +103,7 @@
     <label class="field" for="deptSelect">Your team</label>
     <p class="hint">You'll get questions about the work this team really does.</p>
     <select id="deptSelect"></select>
+    <input type="text" id="otherTeam" maxlength="40" autocomplete="off" placeholder="Which team? (e.g. Legal, Procurement)" style="display:none;" />
 
     <label class="field">Do you work out of the Delhi NCR office?</label>
     <div class="toggle" id="officeToggle">
@@ -201,7 +202,7 @@
   function bandFor(s) { for (var i = 0; i < BANDS.length; i++) { if (s <= BANDS[i].max) return BANDS[i]; } return BANDS[BANDS.length - 1]; }
 
   var DEPARTMENTS = [
-    "Product", "Engineering", "Content / Curriculum", "Academic / Pedagogy",
+    "Product", "Engineering", "QA", "Content / Curriculum", "Academic / Pedagogy",
     "Sales / Partnerships", "Customer Success", "Operations", "Program / Implementation",
     "Data / Analytics", "HR / People", "Finance", "Design", "Marketing",
     "Leadership / Management", "Other"
@@ -250,9 +251,15 @@
       checkStart();
     });
   });
-  function checkStart() { startBtn.disabled = !(nameInput.value.trim() && deptSelect.value && office); }
+  var otherTeam = document.getElementById("otherTeam");
+  function teamValue() { return deptSelect.value === "Other" ? otherTeam.value.trim() : deptSelect.value; }
+  function checkStart() { startBtn.disabled = !(nameInput.value.trim() && teamValue() && office); }
   nameInput.addEventListener("input", checkStart);
-  deptSelect.addEventListener("change", checkStart);
+  otherTeam.addEventListener("input", checkStart);
+  deptSelect.addEventListener("change", function () {
+    otherTeam.style.display = deptSelect.value === "Other" ? "block" : "none";
+    checkStart();
+  });
   checkStart();
 
   /* ---- talk to the agent (or mock) ---- */
@@ -271,7 +278,7 @@
   /* ---- start ---- */
   startBtn.addEventListener("click", function () {
     personName = nameInput.value.trim();
-    department = deptSelect.value;
+    department = teamValue();
     try { localStorage.setItem("skillLadderName", personName); } catch (e) {}
     responses = []; current = 0;
     deptLabel.textContent = department;
