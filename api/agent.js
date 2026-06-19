@@ -18,7 +18,10 @@ import Anthropic from "@anthropic-ai/sdk";
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY from the environment
 const MODEL = "claude-opus-4-8";
 const TOTAL = 10;
-const DIMS = ["Adoption", "Prompting", "Reusable skills", "Verification", "Automation", "Building"];
+// Six parameters in three layers: Awareness (do they reach for AI?), Ability
+// (Prompting, Verification — can they get good, trustworthy results?), and
+// Leverage (Reuse, Automation, Building — do they scale and create?).
+const DIMS = ["Awareness", "Prompting", "Verification", "Reuse", "Automation", "Building"];
 
 const NEXT_SCHEMA = {
   type: "object",
@@ -56,13 +59,27 @@ function nextSystem(department, n) {
 
 You ask ONE multiple-choice question at a time and adapt to their previous answers. This is question ${n} of ${TOTAL}.
 
+You are measuring SIX parameters, in three layers. Cover all six across the 10 questions and put the parameter you are probing in "area":
+
+AWARENESS LAYER — do they reach for AI at all?
+- Awareness: knows what AI can do for their work and reaches for it by default, not as a last resort.
+
+ABILITY LAYER — can they get good, trustworthy results?
+- Prompting: briefs AI clearly enough to get usable output.
+- Verification: checks AI's output against a standard before trusting it.
+
+LEVERAGE LAYER — do they scale and create?
+- Reuse: turns what works into reusable skills/templates for consistent quality.
+- Automation: runs AI over volume or on a schedule with little hand-holding.
+- Building: builds tools/agents others rely on, and helps others do the same.
+
 Write the question so that:
 - It is grounded in a concrete, recurring ${department} task — not a generic "do you use AI" question.
-- There are EXACTLY 4 options. Each option describes a real behaviour the person might actually do, in plain words.
-- The 4 options are CLOSE and subtly different, so someone can't just spot and pick the "best" one. Do NOT write an obvious 1-2-3-4 ladder, and do NOT always put the most advanced option last — vary the order.
-- Across the 10 questions you cover these six dimensions: ${DIMS.join(", ")}. Return the dimension you are probing in "area". Don't keep repeating a dimension already covered well unless you are deliberately probing deeper.
-- Adapt to the history: if their answers show high maturity, ask harder questions that separate "builds a tool for myself" from "ships tools/agents other people depend on". If their answers show low maturity, calibrate between "doesn't really use AI" and "uses it for quick drafts".
-- Use plain English. The audience includes non-native English speakers. Not childish, no jargon.
+- There are EXACTLY 4 options, each a real behaviour in plain words. The 4 are CLOSE and subtly different so someone can't just pick the "best" one. No obvious 1-2-3-4 ladder; vary the order.
+- For an AWARENESS question, probe mindset/instinct — whether they think to use AI and know what it can do — not just how often they use it.
+- Don't re-cover a parameter already probed well unless you are deliberately going deeper.
+- Adapt to the history: high maturity → harder questions separating "builds a tool for myself" from "ships tools/agents others depend on"; low maturity → calibrate between "doesn't really use AI" and "uses it for quick drafts".
+- Plain English; the audience includes non-native speakers; not childish, no jargon.
 
 Return only the JSON object.`;
 }
@@ -79,11 +96,17 @@ Give an overall integer score from 1 to 10, anchored like this:
 
 Score ONLY from the behaviours the person actually selected (in the transcript). Be calibrated and slightly strict — most real people land between 3 and 6. Don't inflate.
 
-Also rate each of these six dimensions from 1 to 10, returning them with these EXACT names: ${DIMS.join(", ")}.
+Also rate each of these six parameters from 1 to 10, returning them with these EXACT names: ${DIMS.join(", ")}. They mean:
+- Awareness: reaches for AI by default and knows what it can do.
+- Prompting: briefs AI well enough to get usable output.
+- Verification: checks output against a standard before trusting it.
+- Reuse: reusable skills/templates for consistent quality.
+- Automation: runs AI over volume or on a schedule with little hand-holding.
+- Building: builds tools/agents others rely on, and helps others build.
 
 Write a 1-2 sentence "insight" for the team lead (the person being assessed will NOT see it): what they do well, and the single biggest opportunity to push their workflow further toward automation and building tools.
 
-Give a short, friendly "level" label for the overall score (for example: "Just starting", "Hands-on user", "Delegator", "Builder", "Ships for others").
+Give a short, friendly "level" label for the overall score (for example: "Just starting", "Hands-on user", "Builder", "Ships for others").
 
 Return only the JSON object.`;
 }

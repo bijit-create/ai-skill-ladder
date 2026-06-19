@@ -73,7 +73,7 @@
   // or pass ?data=<url> in the page URL. Use ?demo=1 to render with sample data.
   var DATA_URL = "https://script.google.com/macros/s/AKfycby5vQQqYMUAD9RxbHCy8XV0-jrNZrmtzB3c6jcv0KXyelYGCqrs2xHZDyEBN4qO93Wt2w/exec";
 
-  var DIMS = ["Adoption", "Prompting", "Reusable skills", "Verification", "Automation", "Building"];
+  var DIMS = ["Awareness", "Prompting", "Verification", "Reuse", "Automation", "Building"];
   var COLORS = { low: "#3b82f6", mid: "#14b8a6", high: "#f59e0b", top: "#db2777" };
   function scoreColor(s) { return s <= 3 ? COLORS.low : s <= 5 ? COLORS.mid : s <= 8 ? COLORS.high : COLORS.top; }
 
@@ -249,7 +249,7 @@
 
   /* ---- demo data (?demo=1) ---- */
   function DEMO_ROWS() {
-    function dim(a, p, r, v, au, b) { return [{ name: "Adoption", value: a }, { name: "Prompting", value: p }, { name: "Reusable skills", value: r }, { name: "Verification", value: v }, { name: "Automation", value: au }, { name: "Building", value: b }]; }
+    function dim(a, p, r, v, au, b) { return [{ name: "Awareness", value: a }, { name: "Prompting", value: p }, { name: "Reuse", value: r }, { name: "Verification", value: v }, { name: "Automation", value: au }, { name: "Building", value: b }]; }
     return [
       { timestamp: "", name: "Aarav K", department: "Engineering", office: "Yes", score: 9, level: "Ships for others", dimensions: dim(10, 9, 8, 8, 9, 10), insight: "Strong builder; could formalise evals on the agents already in production.", answers: [{ area: "Building", choice: "ships ones others use, with guardrails" }] },
       { timestamp: "", name: "Vivaan D", department: "Engineering", office: "Yes", score: 7, level: "Builder", dimensions: dim(8, 8, 6, 6, 7, 7), insight: "Solid hands-on builder; verification is the gap before scaling.", answers: [] },

@@ -74,7 +74,12 @@
   .scale-fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg,#3b82f6,#7c3aed,#db2777); transition: width .9s cubic-bezier(.2,.8,.2,1); }
   .scale-ends { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); }
   .level { font-size: 1.35rem; font-weight: 700; margin: 18px 0 4px; }
-  .level-note { color: var(--muted); font-size: .95rem; margin: 0; }
+  .where { color: #2a3346; font-size: .96rem; margin: 8px 0 0; }
+  .level-note { color: var(--muted); font-size: .9rem; margin: 8px 0 0; }
+  .next { text-align: left; background: var(--accent-soft); border: 1px solid #d9def8; border-radius: 12px; padding: 14px 16px; margin-top: 18px; }
+  .next-title { font-weight: 700; font-size: .95rem; margin-bottom: 6px; }
+  .next ul { margin: 0; padding-left: 18px; }
+  .next li { margin-bottom: 5px; font-size: .92rem; color: #2a3346; }
   .saved-note { color: var(--muted); font-size: .8rem; margin-top: 18px; }
 
   .err { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 11px; padding: 12px 14px; font-size: .9rem; color: #92400e; margin-top: 12px; display: none; }
@@ -128,7 +133,9 @@
     <div class="scale"><div class="scale-fill" id="scaleFill"></div></div>
     <div class="scale-ends"><span>1 · just starting</span><span>10 · builds &amp; ships</span></div>
     <div class="level" id="levelLabel"></div>
+    <p class="where" id="whereYouAre"></p>
     <p class="level-note" id="levelNote">There is no pass or fail — this is where your work sits today.</p>
+    <div class="next" id="nextSteps"></div>
     <p class="saved-note" id="savedNote"></p>
   </div>
 
@@ -147,7 +154,51 @@
   var API_BASE = "";
   var RECORDER_URL = "https://script.google.com/macros/s/AKfycby5vQQqYMUAD9RxbHCy8XV0-jrNZrmtzB3c6jcv0KXyelYGCqrs2xHZDyEBN4qO93Wt2w/exec";
   var TOTAL = 10;
-  var DIMS = ["Adoption", "Prompting", "Reusable skills", "Verification", "Automation", "Building"];
+  var DIMS = ["Awareness", "Prompting", "Verification", "Reuse", "Automation", "Building"];
+
+  // Per-band growth guidance shown to the taker (generic per score band — same for
+  // everyone at a given score). General, vendor-neutral avenues; not our training.
+  var BANDS = [
+    { max: 3, label: "Just getting started",
+      where: "AI isn't really part of your work yet — or you're only just dipping in.",
+      title: "To climb toward a 4–5:",
+      steps: [
+        "Pick one small task a day to do with a free AI chat (Claude, ChatGPT or Gemini) — a draft, a summary, a quick explanation.",
+        "Spot your repetitive tasks; those are the first ones worth handing to AI.",
+        "Skim a short “AI for everyday work” intro to see what's actually possible." ] },
+    { max: 5, label: "Hands-on user",
+      where: "You use AI for drafts and quick help, and you're getting comfortable with it.",
+      title: "To climb toward a 7:",
+      steps: [
+        "Give AI a full brief — the background, the input, and the exact output you want — not a one-line question.",
+        "Save the prompts that work as reusable instructions you can run again, so quality stays consistent.",
+        "Before trusting an answer that matters, write down 2–3 checks and test it against them.",
+        "Try a no-code builder like Google AI Studio to turn a routine task into a small tool." ] },
+    { max: 7, label: "Builder",
+      where: "You hand whole tasks to AI with clear briefs and reusable setups, and you check the output.",
+      title: "To climb toward a 9:",
+      steps: [
+        "Turn one of your setups into something a colleague can use, not just you.",
+        "Learn to run AI over many items at once — a simple script or an API call instead of one-by-one.",
+        "Add a written pass/fail check (an “eval”) so you can trust big runs.",
+        "Explore agents/automation so a task can run on a schedule with a human checkpoint." ] },
+    { max: 9, label: "Ships for others",
+      where: "You build tools others rely on and automate real work.",
+      title: "To reach a 10:",
+      steps: [
+        "Publish a tool at a live link that two or more teams use for real work.",
+        "Put guardrails, a record of what ran, and a human sign-off on anything that runs on its own.",
+        "Help others build — turn your know-how into something teammates can copy.",
+        "Explore small/fine-tuned models or multi-step agents for the hardest jobs." ] },
+    { max: 10, label: "Leading the way",
+      where: "You build AI systems others depend on, across the stack.",
+      title: "Where it goes from here:",
+      steps: [
+        "Mentor others and set the standards your team builds to.",
+        "Take on org-wide systems — shared agents, evals, and pipelines.",
+        "Keep an eye on the frontier (new models, agent patterns) and bring the best back in." ] }
+  ];
+  function bandFor(s) { for (var i = 0; i < BANDS.length; i++) { if (s <= BANDS[i].max) return BANDS[i]; } return BANDS[BANDS.length - 1]; }
 
   var DEPARTMENTS = [
     "Product", "Engineering", "Content / Curriculum", "Academic / Pedagogy",
@@ -323,11 +374,15 @@
   function showResult(r) {
     var score = Math.max(1, Math.min(10, Math.round(r.score)));
     var first = (personName.split(/\s+/)[0] || personName);
+    var band = bandFor(score);
     document.getElementById("greeting").textContent = "Okay, " + first + " 👋";
     document.getElementById("scoreNum").textContent = score;
-    document.getElementById("levelLabel").textContent = r.level || "";
-    document.getElementById("levelNote").textContent =
-      "That's where your work sits today, " + first + " — no pass or fail, just a snapshot of right now.";
+    document.getElementById("levelLabel").textContent = band.label;
+    document.getElementById("whereYouAre").textContent = band.where;
+    document.getElementById("levelNote").textContent = "No pass or fail, " + first + " — just where you are today.";
+    document.getElementById("nextSteps").innerHTML =
+      '<div class="next-title">' + escapeHtml(band.title) + '</div><ul>' +
+      band.steps.map(function (s) { return "<li>" + escapeHtml(s) + "</li>"; }).join("") + '</ul>';
     quizCard.style.display = "none";
     document.getElementById("result").style.display = "block";
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -336,11 +391,13 @@
 
   function record(r) {
     var note = document.getElementById("savedNote");
-    if (!RECORDER_URL) { note.textContent = useMock ? "Demo mode — nothing was saved." : "Your result is shown above (recording not set up)."; return; }
+    if (useMock) { note.textContent = "Demo mode — nothing was saved."; return; }
+    if (!RECORDER_URL) { note.textContent = "Your result is shown above (recording not set up)."; return; }
+    var sc = Math.max(1, Math.min(10, Math.round(r.score)));
     var payload = {
       name: personName, department: department, office: office,
-      score: Math.max(1, Math.min(10, Math.round(r.score))),
-      level: r.level || "",
+      score: sc,
+      level: bandFor(sc).label,
       dimensions: r.dimensions || [],
       insight: r.insight || "",
       answers: responses.map(function (h) { return { area: h.area, choice: h.chosenText }; })
@@ -351,7 +408,7 @@
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
       });
-      note.textContent = "Recorded for your team (no name, no email).";
+      note.textContent = "Recorded for your team — thanks!";
     } catch (e) { note.textContent = "Your score is shown above."; }
   }
 
@@ -369,13 +426,13 @@
      1-2-3-4 ladder.
      =========================================================================== */
   var MOCK_BANK = [
-    { dim: "Adoption", q: "Think about yesterday — how did AI show up in your work?", o: [
+    { dim: "Awareness", q: "Think about yesterday — how did AI show up in your work?", o: [
       ["I didn't open an AI tool", 0], ["I asked it one or two quick things", 1],
       ["I leaned on it across several different tasks", 2], ["Most of what I shipped passed through something I'd set up", 3] ] },
     { dim: "Prompting", q: "When you needed something specific from AI recently, what did the ask look like?", o: [
       ["A one-liner, then I took what came back", 0], ["I kept nudging it until it landed", 1],
       ["One brief with the context and the shape I wanted", 2], ["I didn't write it — a saved setup already carries the brief", 3] ] },
-    { dim: "Reusable skills", q: "Your standards for this work mostly live…", o: [
+    { dim: "Reuse", q: "Your standards for this work mostly live…", o: [
       ["in my head; I redo them each time", 0], ["pasted from older chats when I remember", 1],
       ["in a few prompts or templates I keep handy", 2], ["in a reusable setup the team runs the same way", 3] ] },
     { dim: "Verification", q: "Last time an AI output actually mattered, how did you decide to trust it?", o: [
@@ -387,7 +444,7 @@
     { dim: "Building", q: "Has anything you set up with AI ended up in someone else's hands?", o: [
       ["no", 0], ["I shared a prompt that worked for me", 1],
       ["a small tool I made, used by a teammate or two", 2], ["something I ship and keep improving that others depend on", 3] ] },
-    { dim: "Adoption", q: "If AI tools vanished for a day, your week would…", o: [
+    { dim: "Awareness", q: "If AI tools vanished for a day, your week would…", o: [
       ["barely change", 0], ["be a few tasks slower", 1],
       ["be noticeably slower across the day", 2], ["have several things that just wouldn't run", 3] ] },
     { dim: "Automation", q: "Do any of your tasks run without you kicking them off?", o: [
