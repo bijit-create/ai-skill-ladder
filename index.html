@@ -154,7 +154,7 @@
      =========================================================================== */
   var API_BASE = "";
   var RECORDER_URL = "https://script.google.com/macros/s/AKfycby5vQQqYMUAD9RxbHCy8XV0-jrNZrmtzB3c6jcv0KXyelYGCqrs2xHZDyEBN4qO93Wt2w/exec";
-  var TOTAL = 10;
+  var MAX_Q = 12;   // never ask more than this; the agent decides when to stop (min 9)
   var DIMS = ["Awareness", "Prompting", "Verification", "Reuse", "Automation", "Building"];
 
   // Per-band growth guidance shown to the taker (generic per score band — same for
@@ -215,6 +215,7 @@
   var personName = "", department = "", office = "", current = 0, chosen = null; // NOT named `name` (that shadows window.name)
   var responses = [];         // [{area, question, options:[...], chosen:idx, chosenText}] — NOT named `history` (that shadows window.history)
   var currentQuestion = null; // {area, question, options:[...]}
+  var guidance, traces = [], lastResult = null; // guidance: learned guidance carried across the session; traces: per-call {latencyMs,inTokens,outTokens,model}
 
   /* ---- elements ---- */
   var nameInput = document.getElementById("nameInput");
@@ -280,7 +281,7 @@
     personName = nameInput.value.trim();
     department = teamValue();
     try { localStorage.setItem("skillLadderName", personName); } catch (e) {}
-    responses = []; current = 0;
+    responses = []; current = 0; traces = []; guidance = undefined;
     deptLabel.textContent = department;
     startErr.style.display = "none";
     startBtn.disabled = true; startBtn.textContent = "Starting…";
@@ -309,12 +310,16 @@
   function askNext() {
     chosen = null;
     nextBtn.disabled = true;
-    progressLabel.textContent = "Question " + (current + 1) + " of " + TOTAL;
-    progressFill.style.width = (current / TOTAL * 100) + "%";
+    nextBtn.textContent = "Next";
+    progressLabel.textContent = "Question " + (current + 1);
+    progressFill.style.width = Math.min(100, (current / MAX_Q) * 100) + "%";
     qArea.innerHTML = '<div class="thinking"><span class="dots">Choosing your next question</span></div>';
     quizErr.style.display = "none";
 
-    return callAgent("next", { department: department, history: responses }).then(function (q) {
+    return callAgent("next", { department: department, history: responses, guidance: guidance }).then(function (q) {
+      if (q._trace) traces.push(q._trace);
+      if (q.guidance !== undefined) guidance = q.guidance; // captured on the first call; carried onward
+      if (q.done) { finish(); return; }
       currentQuestion = q;
       renderQuestion(q);
     }).catch(function (err) {
@@ -341,7 +346,7 @@
         nextBtn.disabled = false;
       });
     });
-    nextBtn.textContent = (current === TOTAL - 1) ? "See my score" : "Next";
+    nextBtn.textContent = "Next";
     setTimeout(function () { qArea.style.opacity = 1; }, 30);
   }
 
@@ -354,10 +359,11 @@
       question: currentQuestion.question,
       options: currentQuestion.options,
       chosen: chosen,
-      chosenText: currentQuestion.options[chosen]
+      chosenText: currentQuestion.options[chosen],
+      latencyMs: currentQuestion._trace ? currentQuestion._trace.latencyMs : null
     });
     current++;
-    if (current >= TOTAL) { finish(); }
+    if (current >= MAX_Q) { finish(); }
     else { askNext(); }
   });
 
@@ -367,7 +373,9 @@
     qArea.innerHTML = '<div class="thinking"><span class="dots">Working out your score</span></div>';
     nextBtn.disabled = true; nextBtn.style.display = "none";
 
-    callAgent("score", { department: department, history: responses }).then(function (r) {
+    callAgent("score", { department: department, history: responses, guidance: guidance }).then(function (r) {
+      if (r._trace) traces.push(r._trace);
+      lastResult = r;
       showResult(r);
       record(r);
     }).catch(function (err) {
@@ -401,13 +409,24 @@
     if (useMock) { note.textContent = "Demo mode — nothing was saved."; return; }
     if (!RECORDER_URL) { note.textContent = "Your result is shown above (recording not set up)."; return; }
     var sc = Math.max(1, Math.min(10, Math.round(r.score)));
+    var totalTokens = traces.reduce(function (a, t) { return a + (t ? (t.inTokens + t.outTokens) : 0); }, 0);
+    var totalLatency = traces.reduce(function (a, t) { return a + (t ? t.latencyMs : 0); }, 0);
+    var modelUsed = (traces.filter(function (t) { return t && t.model; })[0] || {}).model || "";
     var payload = {
       name: personName, department: department, office: office,
       score: sc,
       level: bandFor(sc).label,
       dimensions: r.dimensions || [],
       insight: r.insight || "",
-      answers: responses.map(function (h) { return { area: h.area, choice: h.chosenText }; })
+      answers: responses.map(function (h) { return { area: h.area, question: h.question, options: h.options, choice: h.chosenText, latencyMs: h.latencyMs }; }),
+      meta: {
+        questionsAsked: responses.length,
+        model: modelUsed,
+        totalTokens: totalTokens,
+        totalLatencyMs: totalLatency,
+        guidanceVersion: (guidance && guidance.version) ? guidance.version : "base",
+        scoreReasoning: r.reasoning || ""
+      }
     };
     try {
       fetch(RECORDER_URL, {
@@ -468,15 +487,19 @@
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
   function mockAgent(action, payload) {
+    var TR = { latencyMs: 8, inTokens: 0, outTokens: 0, model: "mock" };
     if (action === "next") {
       var n = payload.history.length;
+      if (n >= 10) return { done: true, _trace: TR };           // mock stops at 10
       var item = MOCK_BANK[n % MOCK_BANK.length];
       var opts = shuffle(item.o.map(function (x) { return { t: x[0], w: x[1] }; }));
       // stash weights on the question so mock scoring can read the chosen weight back
       mockAgent._w = mockAgent._w || {};
       mockAgent._w[item.q] = {};
       opts.forEach(function (op, i) { mockAgent._w[item.q][op.t] = op.w; });
-      return { area: item.dim, question: item.q, options: opts.map(function (op) { return op.t; }) };
+      var out = { done: false, area: item.dim, question: item.q, options: opts.map(function (op) { return op.t; }), _trace: TR };
+      if (n === 0) out.guidance = null;
+      return out;
     }
     if (action === "score") {
       var byDim = {}; DIMS.forEach(function (d) { byDim[d] = []; });
@@ -494,7 +517,9 @@
       var levels = ["Just starting", "Just starting", "Hands-on user", "Hands-on user", "Hands-on user",
                     "Delegator", "Delegator", "Builder", "Builder", "Ships for others", "Ships for others"];
       return { score: score, level: levels[score], dimensions: dimensions,
-               insight: "(demo) Strongest on " + topDim(dimensions) + "; biggest opportunity is moving routine work toward automation and reusable tools." };
+               insight: "(demo) Strongest on " + topDim(dimensions) + "; biggest opportunity is moving routine work toward automation and reusable tools.",
+               reasoning: "(demo) Score derived from the mock weights of the options picked.",
+               _trace: TR };
     }
     return {};
   }
